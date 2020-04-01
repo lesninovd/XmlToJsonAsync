@@ -1,0 +1,8 @@
+<subscribers>
+	<subscriber msisdn='79260000000'>
+		<balance>53.21</balance>
+	</subscriber>
+	<subscriber msisdn='79260000001'>
+		<balance>-5.3</balance>
+	</subscriber>
+</subscribers>
