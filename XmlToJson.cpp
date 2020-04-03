@@ -117,6 +117,7 @@ XmlToJson::ItemTypePrivate XmlToJson::addItem(const pt::ptree::value_type &node)
             _itemQueue.emplace_back(type, nodeName);
             break;
         }
+        _waitItemCondition.notify_one();
     }
     return type;
 }
