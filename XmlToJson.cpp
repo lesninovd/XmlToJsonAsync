@@ -31,19 +31,63 @@ void XmlToJson::readXml(const std::string &xmlFileName)
 
 void XmlToJson::writeJson(const std::string &jsonFileName)
 {
-    rj::StringBuffer s;
-    rj::Writer<rj::StringBuffer> writer(s);
-    writer.StartObject();
-
+    json root;
     auto item = getItem();
     while (item.type != ItemTypePrivate::End) {
-        addItemToWriter(item, writer);
+        addItemToJson(item);
         item = getItem();
     }
 
-    writer.EndObject();
+    auto jsonByName = _jsonByNameHierarchy.top();
+    _jsonByNameHierarchy.pop();
+    root.emplace(jsonByName.first, jsonByName.second);
     std::ofstream out {jsonFileName, std::ios::trunc};
-    out << s.GetString();
+    if (!out.is_open()) {
+        throw std::invalid_argument("Failed to open file " + jsonFileName);
+    }
+    out << root;
+}
+
+void XmlToJson::addItemToJson(const XmlToJson::Item &item)
+{
+    switch (item.type) {
+    case ItemTypePrivate::StartObject:
+        _jsonByNameHierarchy.emplace(item.name, json::object());
+        break;
+    case ItemTypePrivate::StartArray:
+        _jsonByNameHierarchy.emplace(item.name, json::array());
+        break;
+    case ItemTypePrivate::EndObject:
+    case ItemTypePrivate::EndArray:
+        collapseHierarchy();
+        break;
+    case ItemTypePrivate::String:
+        addValue<std::string>(item);
+        break;
+    case ItemTypePrivate::Double:
+        addValue<double>(item);
+        break;
+    case ItemTypePrivate::Int:
+        addValue<int>(item);
+        break;
+    default:
+        throw std::invalid_argument("unknown item type");
+        break;
+    }
+}
+
+void XmlToJson::collapseHierarchy()
+{
+    if (_jsonByNameHierarchy.size() > 1) {
+        auto jsonByName = _jsonByNameHierarchy.top();
+        _jsonByNameHierarchy.pop();
+        auto parent = &_jsonByNameHierarchy.top().second;
+        if (parent->is_array()) {
+            parent->emplace_back(jsonByName.second);
+        } else {
+            parent->emplace(jsonByName.first, jsonByName.second);
+        }
+    }
 }
 
 void XmlToJson::readNode(const pt::ptree::value_type &node)
@@ -92,10 +136,7 @@ XmlToJson::Item XmlToJson::getItem()
 
 XmlToJson::ItemTypePrivate XmlToJson::addItem(const pt::ptree::value_type &node)
 {
-    std::string nodeName;
-    if (_ignoreNames.count(node.first) == 0) {
-        nodeName = node.first;
-    }
+    std::string nodeName = node.first;
     auto type = ItemTypePrivate::String;
     auto keyTypePairIt = _typesByName.find(node.first);
     if (keyTypePairIt != _typesByName.end()) {
@@ -117,8 +158,8 @@ XmlToJson::ItemTypePrivate XmlToJson::addItem(const pt::ptree::value_type &node)
             _itemQueue.emplace_back(type, nodeName);
             break;
         }
-        _waitItemCondition.notify_one();
     }
+    _waitItemCondition.notify_one();
     return type;
 }
 
