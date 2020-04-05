@@ -72,7 +72,7 @@ void XmlToJson::addItemToJson(const XmlToJson::Item &item)
         break;
     default:
         throw std::invalid_argument("unknown item type");
-        break;
+//        break;
     }
 }
 
@@ -92,7 +92,7 @@ void XmlToJson::collapseHierarchy()
 
 void XmlToJson::readNode(const pt::ptree::value_type &node)
 {
-    ItemTypePrivate itemType;
+    ItemTypePrivate itemType = ItemTypePrivate::String;
     if (_ignoreNodes.count(node.first) == 0) {
         itemType = addItem(node);
     }
@@ -158,8 +158,8 @@ XmlToJson::ItemTypePrivate XmlToJson::addItem(const pt::ptree::value_type &node)
             _itemQueue.emplace_back(type, nodeName);
             break;
         }
+        _waitItemCondition.notify_one();
     }
-    _waitItemCondition.notify_one();
     return type;
 }
 
@@ -168,19 +168,16 @@ XmlToJson::ItemTypePrivate XmlToJson::itemTypeToPrivate(ItemType type)
     XmlToJson::ItemTypePrivate typePrivate;
     switch (type) {
     case ItemType::Array:
-        typePrivate = XmlToJson::ItemTypePrivate::StartArray;
+        typePrivate = ItemTypePrivate::StartArray;
         break;
     case ItemType::Object:
-        typePrivate = XmlToJson::ItemTypePrivate::StartObject;
+        typePrivate = ItemTypePrivate::StartObject;
         break;
     case ItemType::Double:
-        typePrivate = XmlToJson::ItemTypePrivate::Double;
+        typePrivate = ItemTypePrivate::Double;
         break;
     case ItemType::Int:
-        typePrivate = XmlToJson::ItemTypePrivate::Int;
-        break;
-    default:
-        throw std::invalid_argument("unknown item type");
+        typePrivate = ItemTypePrivate::Int;
         break;
     }
     return typePrivate;
